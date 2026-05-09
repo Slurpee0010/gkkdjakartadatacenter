@@ -1,0 +1,69 @@
+@extends('layouts.app')
+
+@section('title', 'Daftar Anak Bimbingan')
+@section('breadcrumb')
+<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span>Anak Bimbingan
+@endsection
+
+@section('content')
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <div class="page-header mb-0">
+        <h1 class="page-title">Daftar Anak Bimbingan</h1>
+        <p class="page-subtitle">Kelola data anak bimbingan gereja</p>
+    </div>
+    <a href="{{ route('anak_bimbingan.create') }}" class="btn-gkkd btn-primary-gkkd">
+        <i class="fas fa-plus"></i> Tambah Anak Bimbingan
+    </a>
+</div>
+
+<div class="gkkd-card fade-in">
+    <div class="gkkd-card-body" style="padding: 0;">
+        @if($anakBimbingans->count() > 0)
+        <div class="table-responsive">
+            <table class="gkkd-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">No</th>
+                        <th>Nama Anak</th>
+                        <th>Pembimbing</th>
+                        <th>Wilayah</th>
+                        <th>Pelayanan</th>
+                        <th style="width: 180px;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($anakBimbingans as $index => $anakBimbingan)
+                    <tr>
+                        <td style="color: var(--text-muted); font-weight: 500;">{{ $index + 1 }}</td>
+                        <td style="font-weight: 600;">{{ $anakBimbingan->nama_anak }}</td>
+                        <td><span class="gkkd-badge badge-warning">{{ $anakBimbingan->pembimbing->nama_pembimbing ?? '-' }}</span></td>
+                        <td><span class="gkkd-badge badge-primary">{{ $anakBimbingan->wilayah->nama_wilayah ?? '-' }}</span></td>
+                        <td><span class="gkkd-badge badge-success">{{ $anakBimbingan->pelayanan->nama_pelayanan ?? '-' }}</span></td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <a href="{{ route('anak_bimbingan.edit', $anakBimbingan->id) }}" class="btn-gkkd btn-sm-gkkd btn-edit-gkkd">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <form action="{{ route('anak_bimbingan.destroy', $anakBimbingan->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Yakin ingin menghapus anak bimbingan ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn-gkkd btn-sm-gkkd btn-delete-gkkd">
+                                        <i class="fas fa-trash-alt"></i> Hapus
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @else
+        <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <p>Belum ada data anak bimbingan. Klik tombol "Tambah Anak Bimbingan" untuk menambahkan.</p>
+        </div>
+        @endif
+    </div>
+</div>
+@endsection
