@@ -16,6 +16,17 @@
     </a>
 </div>
 
+@include('partials.data-filters', [
+    'title' => 'Filter Master Blesscomn',
+    'actionRoute' => 'master_blesscomn.index',
+    'exportRoute' => 'master_blesscomn.export',
+    'resetRoute' => 'master_blesscomn.index',
+    'filterIdPrefix' => 'master_blesscomn',
+    'wilayahParam' => 'id_wilayah',
+    'pelayananParam' => 'id_pelayanan',
+    'searchPlaceholder' => 'Blesscomn, ketua, asisten',
+])
+
 <div class="gkkd-card fade-in">
     <div class="gkkd-card-body" style="padding: 0;">
         @if($blesscomns->count() > 0)
@@ -73,7 +84,7 @@
         @else
         <div class="empty-state">
             <i class="fas fa-church"></i>
-            <p>Belum ada data blesscomn. Klik tombol "Tambah Blesscomn" untuk menambahkan.</p>
+            <p>Tidak ada blesscomn sesuai filter atau search.</p>
         </div>
         @endif
     </div>

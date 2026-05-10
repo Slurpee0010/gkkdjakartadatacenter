@@ -13,6 +13,16 @@ use Carbon\Carbon;
 class DashboardBlesscomnController extends Controller
 {
     /**
+     * Expression for grouping dates by year-month across supported databases.
+     */
+    private function yearMonthExpression(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
+    }
+
+    /**
      * Menampilkan halaman dashboard analytics Blesscomn.
      */
     public function index(Request $request)
@@ -93,6 +103,8 @@ class DashboardBlesscomnController extends Controller
      */
     private function buildReportKeaktifan($dateFrom, $dateTo, $wilayahId, $pelayananId, $totalBulan)
     {
+        $bulanExpression = $this->yearMonthExpression('laporan_blesscomns.tanggal_pelaksanaan');
+
         $query = DB::table('laporan_blesscomns')
             ->join('master_blesscomns', 'laporan_blesscomns.id_blesscomn', '=', 'master_blesscomns.id')
             ->join('wilayahs', 'laporan_blesscomns.id_wilayah', '=', 'wilayahs.id')
@@ -112,7 +124,7 @@ class DashboardBlesscomnController extends Controller
             'master_blesscomns.nama_blesscomn',
             'wilayahs.nama_wilayah',
             'pelayanans.nama_pelayanan',
-            DB::raw("COUNT(DISTINCT DATE_FORMAT(laporan_blesscomns.tanggal_pelaksanaan, '%Y-%m')) as bulan_aktif")
+            DB::raw("COUNT(DISTINCT {$bulanExpression}) as bulan_aktif")
         )
             ->groupBy(
                 'laporan_blesscomns.id_blesscomn',
@@ -181,6 +193,8 @@ class DashboardBlesscomnController extends Controller
      */
     private function buildReportStreaks($wilayahId, $pelayananId)
     {
+        $bulanExpression = $this->yearMonthExpression('tanggal_pelaksanaan');
+
         // Ambil semua blesscomn dengan laporan
         $blesscomnQuery = MasterBlesscomn::with(['wilayah', 'pelayanan'])
             ->when($wilayahId, fn($q) => $q->where('id_wilayah', $wilayahId))
@@ -194,7 +208,7 @@ class DashboardBlesscomnController extends Controller
         foreach ($blesscomnQuery as $blesscomn) {
             // Ambil semua bulan unik dari laporan blesscomn ini
             $bulanAktif = LaporanBlesscomn::where('id_blesscomn', $blesscomn->id)
-                ->select(DB::raw("DISTINCT DATE_FORMAT(tanggal_pelaksanaan, '%Y-%m') as bulan"))
+                ->select(DB::raw("DISTINCT {$bulanExpression} as bulan"))
                 ->orderByDesc('bulan')
                 ->pluck('bulan')
                 ->toArray();

@@ -21,6 +21,17 @@
     </div>
 </div>
 
+@include('partials.data-filters', [
+    'title' => 'Filter Laporan PA',
+    'actionRoute' => 'laporan_pa.index',
+    'exportRoute' => 'laporan_pa.export',
+    'resetRoute' => 'laporan_pa.index',
+    'filterIdPrefix' => 'laporan_pa',
+    'wilayahParam' => 'wilayah_id',
+    'pelayananParam' => 'pelayanan_id',
+    'searchPlaceholder' => 'Anak, pembimbing, buku',
+])
+
 <div class="gkkd-card fade-in">
     <div class="gkkd-card-body" style="padding: 0;">
         @if($laporanPas->count() > 0)
@@ -70,7 +81,7 @@
         @else
         <div class="empty-state">
             <i class="fas fa-file-alt"></i>
-            <p>Belum ada laporan PA. Klik tombol "Input Laporan PA" untuk menambahkan.</p>
+            <p>Tidak ada laporan PA sesuai filter atau search.</p>
         </div>
         @endif
     </div>

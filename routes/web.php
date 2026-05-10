@@ -34,6 +34,8 @@ Route::get('/api/get-anak-pa', [LaporanPaController::class, 'getAnakPa'])->name(
 // Ticket 3: Report Keaktifan PA + Export CSV
 Route::get('/laporan-pa/report', [LaporanPaController::class, 'report'])->name('laporan_pa.report');
 Route::get('/laporan-pa/export-csv', [LaporanPaController::class, 'exportCsv'])->name('laporan_pa.export-csv');
+Route::get('/laporan-pa/export-excel', [LaporanPaController::class, 'exportExcel'])->name('laporan_pa.export-excel');
+Route::get('/laporan-pa/export', [LaporanPaController::class, 'exportIndex'])->name('laporan_pa.export');
 
 // =========================================
 // Modul Blesscomn
@@ -41,6 +43,9 @@ Route::get('/laporan-pa/export-csv', [LaporanPaController::class, 'exportCsv'])-
 Route::resource('pengurus_blesscomn', PengurusBlesscomnController::class);
 Route::resource('master_blesscomn', MasterBlesscomnController::class);
 Route::resource('laporan_blesscomn', LaporanBlesscomnController::class);
+Route::get('/pengurus-blesscomn/export', [PengurusBlesscomnController::class, 'export'])->name('pengurus_blesscomn.export');
+Route::get('/master-blesscomn/export', [MasterBlesscomnController::class, 'export'])->name('master_blesscomn.export');
+Route::get('/laporan-blesscomn/export', [LaporanBlesscomnController::class, 'export'])->name('laporan_blesscomn.export');
 
 // API: Cascading dropdown Blesscomn by Wilayah & Pelayanan
 Route::get('/api/get-blesscomn', [MasterBlesscomnController::class, 'getBlesscomnByFilter'])->name('api.get-blesscomn');

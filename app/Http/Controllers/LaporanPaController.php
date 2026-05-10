@@ -8,20 +8,45 @@ use App\Models\Pelayanan;
 use App\Models\Pembimbing;
 use App\Models\AnakBimbingan;
 use App\Models\MasterBukuPa;
+use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class LaporanPaController extends Controller
 {
-    // Menampilkan daftar laporan PA
-    public function index()
+    /**
+     * Expression for grouping dates by year-month across supported databases.
+     */
+    private function yearMonthExpression(string $column): string
     {
-        $laporanPas = LaporanPa::with(['wilayah', 'pelayanan', 'pembimbing', 'anakPa', 'bukuPa'])
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
+    }
+
+    /**
+     * Expression for the unique activity key: anak PA + active month.
+     */
+    private function anakPaMonthExpression(): string
+    {
+        $bulanExpression = $this->yearMonthExpression('laporan_pas.tanggal_pa');
+
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "laporan_pas.anak_pa_id || '-' || {$bulanExpression}"
+            : "CONCAT(laporan_pas.anak_pa_id, '-', {$bulanExpression})";
+    }
+
+    // Menampilkan daftar laporan PA
+    public function index(Request $request)
+    {
+        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
+        $laporanPas = $this->buildIndexQuery($request)
             ->latest('tanggal_pa')
             ->get();
 
-        return view('laporan_pa.index', compact('laporanPas'));
+        return view('laporan_pa.index', compact('laporanPas', 'wilayahs', 'pelayanans'));
     }
 
     // Form untuk menambah laporan PA baru
@@ -283,6 +308,94 @@ class LaporanPaController extends Controller
     }
 
     /**
+     * Export daftar Laporan PA ke CSV atau Excel.
+     */
+    public function exportIndex(Request $request)
+    {
+        $laporanPas = $this->buildIndexQuery($request)
+            ->latest('tanggal_pa')
+            ->get();
+
+        return SimpleTableExporter::download(
+            'laporan_pa',
+            ['Tanggal', 'Anak PA', 'Pembimbing', 'Wilayah', 'Pelayanan', 'Buku', 'Bab'],
+            $laporanPas,
+            fn (LaporanPa $laporan) => [
+                optional($laporan->tanggal_pa)->format('Y-m-d'),
+                $laporan->anakPa->nama_anak ?? '-',
+                $laporan->pembimbing->nama_pembimbing ?? '-',
+                $laporan->wilayah->nama_wilayah ?? '-',
+                $laporan->pelayanan->nama_pelayanan ?? '-',
+                $laporan->nama_buku,
+                $laporan->bab,
+            ],
+            $request->get('format', 'csv')
+        );
+    }
+
+    /**
+     * Export report Keaktifan PA ke Excel.
+     */
+    public function exportExcel(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date',
+            'date_to'   => 'required|date|after_or_equal:date_from',
+        ]);
+
+        $reportData = $this->buildReportQuery($request);
+
+        return SimpleTableExporter::download(
+            'laporan_keaktifan_pa',
+            ['Wilayah', 'Pelayanan', 'Nama Buku PA', 'Jumlah Anak PA Aktif'],
+            $reportData,
+            fn ($row) => [
+                $row->nama_wilayah,
+                $row->nama_pelayanan,
+                $row->nama_buku_display,
+                $row->jumlah_anak_aktif,
+            ],
+            'excel'
+        );
+    }
+
+    /**
+     * Query builder untuk daftar Laporan PA.
+     */
+    private function buildIndexQuery(Request $request)
+    {
+        $query = LaporanPa::with(['wilayah', 'pelayanan', 'pembimbing', 'anakPa', 'bukuPa']);
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('tanggal_pa', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('tanggal_pa', '<=', $request->date_to);
+        }
+        if ($request->filled('wilayah_id')) {
+            $query->where('wilayah_id', $request->wilayah_id);
+        }
+        if ($request->filled('pelayanan_id')) {
+            $query->where('pelayanan_id', $request->pelayanan_id);
+        }
+
+        $search = trim((string) $request->get('search', ''));
+        if ($search !== '') {
+            $query->where(function ($subQuery) use ($search) {
+                $subQuery->where('buku_pa_lainnya', 'like', "%{$search}%")
+                    ->orWhere('bab', 'like', "%{$search}%")
+                    ->orWhereHas('anakPa', fn ($relation) => $relation->where('nama_anak', 'like', "%{$search}%"))
+                    ->orWhereHas('pembimbing', fn ($relation) => $relation->where('nama_pembimbing', 'like', "%{$search}%"))
+                    ->orWhereHas('bukuPa', fn ($relation) => $relation->where('nama_buku', 'like', "%{$search}%"))
+                    ->orWhereHas('wilayah', fn ($relation) => $relation->where('nama_wilayah', 'like', "%{$search}%"))
+                    ->orWhereHas('pelayanan', fn ($relation) => $relation->where('nama_pelayanan', 'like', "%{$search}%"));
+            });
+        }
+
+        return $query;
+    }
+
+    /**
      * Query builder untuk report Keaktifan PA.
      *
      * Business Rule: Dalam 1 bulan, 1 Pembimbing yang melakukan PA
@@ -294,6 +407,8 @@ class LaporanPaController extends Controller
      */
     private function buildReportQuery(Request $request)
     {
+        $anakPaMonthExpression = $this->anakPaMonthExpression();
+
         $query = DB::table('laporan_pas')
             ->join('wilayahs', 'laporan_pas.wilayah_id', '=', 'wilayahs.id')
             ->join('pelayanans', 'laporan_pas.pelayanan_id', '=', 'pelayanans.id')
@@ -309,13 +424,23 @@ class LaporanPaController extends Controller
             $query->where('laporan_pas.pelayanan_id', $request->pelayanan_id);
         }
 
+        $search = trim((string) $request->get('search', ''));
+        if ($search !== '') {
+            $query->where(function ($subQuery) use ($search) {
+                $subQuery->where('wilayahs.nama_wilayah', 'like', "%{$search}%")
+                    ->orWhere('pelayanans.nama_pelayanan', 'like', "%{$search}%")
+                    ->orWhere('master_buku_pas.nama_buku', 'like', "%{$search}%")
+                    ->orWhere('laporan_pas.buku_pa_lainnya', 'like', "%{$search}%");
+            });
+        }
+
         // Distinct count: anak_pa_id + MONTH(tanggal_pa) dianggap 1 keaktifan
         // Kita hitung jumlah pasangan unik (anak_pa_id, bulan) per grup
         $results = $query->select(
                 'wilayahs.nama_wilayah',
                 'pelayanans.nama_pelayanan',
                 DB::raw("COALESCE(master_buku_pas.nama_buku, laporan_pas.buku_pa_lainnya, '-') as nama_buku_display"),
-                DB::raw("COUNT(DISTINCT CONCAT(laporan_pas.anak_pa_id, '-', DATE_FORMAT(laporan_pas.tanggal_pa, '%Y-%m'))) as jumlah_anak_aktif")
+                DB::raw("COUNT(DISTINCT {$anakPaMonthExpression}) as jumlah_anak_aktif")
             )
             ->groupBy(
                 'wilayahs.nama_wilayah',

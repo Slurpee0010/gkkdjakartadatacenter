@@ -16,6 +16,17 @@
     </a>
 </div>
 
+@include('partials.data-filters', [
+    'title' => 'Filter Pengurus Blesscomn',
+    'actionRoute' => 'pengurus_blesscomn.index',
+    'exportRoute' => 'pengurus_blesscomn.export',
+    'resetRoute' => 'pengurus_blesscomn.index',
+    'filterIdPrefix' => 'pengurus_blesscomn',
+    'wilayahParam' => 'id_wilayah',
+    'pelayananParam' => 'id_pelayanan',
+    'searchPlaceholder' => 'Ketua, asisten, no. WA',
+])
+
 <div class="gkkd-card fade-in">
     <div class="gkkd-card-body" style="padding: 0;">
         @if($pengurus->count() > 0)
@@ -71,7 +82,7 @@
         @else
         <div class="empty-state">
             <i class="fas fa-user-shield"></i>
-            <p>Belum ada data pengurus blesscomn. Klik tombol "Tambah Pengurus" untuk menambahkan.</p>
+            <p>Tidak ada pengurus blesscomn sesuai filter atau search.</p>
         </div>
         @endif
     </div>

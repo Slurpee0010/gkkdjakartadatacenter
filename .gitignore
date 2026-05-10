@@ -1,1 +1,8 @@
-".env" 
+.env
+.phpunit.result.cache
+/node_modules
+/package-lock.json
+/public/build
+/database/database.sqlite
+/database/*.sqlite-journal
+/storage/logs/*.log

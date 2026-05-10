@@ -61,15 +61,25 @@
                         </select>
                     </div>
                 </div>
+                <div class="col-md-12">
+                    <div class="gkkd-form-group mb-0">
+                        <label for="search" class="gkkd-form-label">Search <small class="text-muted">(opsional)</small></label>
+                        <input type="search" name="search" id="search" class="gkkd-form-control"
+                               value="{{ request('search') }}" placeholder="Cari wilayah, pelayanan, atau buku PA">
+                    </div>
+                </div>
             </div>
             <div class="d-flex gap-3 mt-4 flex-wrap">
                 <button type="submit" class="btn-gkkd btn-primary-gkkd">
                     <i class="fas fa-search"></i> Tampilkan Report
                 </button>
                 @if($reportData)
-                <a href="{{ route('laporan_pa.export-csv', request()->query()) }}" class="btn-gkkd btn-accent-gkkd" style="background: linear-gradient(135deg, #059669, #34d399);">
+                <button type="submit" formaction="{{ route('laporan_pa.export-excel') }}" class="btn-gkkd btn-accent-gkkd" style="background: linear-gradient(135deg, #059669, #34d399);">
+                    <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+                <button type="submit" formaction="{{ route('laporan_pa.export-csv') }}" class="btn-gkkd btn-accent-gkkd" style="background: linear-gradient(135deg, #059669, #34d399);">
                     <i class="fas fa-file-csv"></i> Export CSV
-                </a>
+                </button>
                 @endif
                 <a href="{{ route('laporan_pa.report') }}" class="btn-gkkd btn-outline-gkkd">
                     <i class="fas fa-undo"></i> Reset

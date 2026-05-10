@@ -5,15 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\PengurusBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
 
 class PengurusBlesscomnController extends Controller
 {
     // Menampilkan daftar pengurus blesscomn
-    public function index()
+    public function index(Request $request)
     {
-        $pengurus = PengurusBlesscomn::with(['wilayah', 'pelayanan'])->latest()->get();
-        return view('pengurus_blesscomn.index', compact('pengurus'));
+        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
+        $pengurus = $this->buildIndexQuery($request)->latest()->get();
+
+        return view('pengurus_blesscomn.index', compact('pengurus', 'wilayahs', 'pelayanans'));
     }
 
     // Form untuk menambah pengurus blesscomn baru
@@ -27,7 +31,7 @@ class PengurusBlesscomnController extends Controller
     // Menyimpan pengurus blesscomn baru ke database
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'nama_ketua'    => 'required|string|max:255',
             'no_wa_ketua'   => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,10}$/'],
             'id_wilayah'    => 'required|exists:wilayahs,id',
@@ -39,9 +43,23 @@ class PengurusBlesscomnController extends Controller
             'no_wa_asisten.regex' => 'Format nomor WA Asisten tidak valid. Contoh: 08123456789',
         ]);
 
-        PengurusBlesscomn::create($request->only([
-            'nama_ketua', 'no_wa_ketua', 'id_wilayah', 'id_pelayanan', 'nama_asisten', 'no_wa_asisten',
-        ]));
+        $pengurusBlesscomn = PengurusBlesscomn::create($validated);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Pengurus Blesscomn berhasil ditambahkan.',
+                'data' => [
+                    'id' => $pengurusBlesscomn->id,
+                    'nama_ketua' => $pengurusBlesscomn->nama_ketua,
+                    'no_wa_ketua' => $pengurusBlesscomn->no_wa_ketua,
+                    'id_wilayah' => $pengurusBlesscomn->id_wilayah,
+                    'id_pelayanan' => $pengurusBlesscomn->id_pelayanan,
+                    'nama_asisten' => $pengurusBlesscomn->nama_asisten,
+                    'no_wa_asisten' => $pengurusBlesscomn->no_wa_asisten,
+                ],
+            ], 201);
+        }
 
         return redirect()->route('pengurus_blesscomn.index')
             ->with('success', 'Data Pengurus Blesscomn berhasil ditambahkan.');
@@ -89,5 +107,64 @@ class PengurusBlesscomnController extends Controller
 
         return redirect()->route('pengurus_blesscomn.index')
             ->with('success', 'Pengurus Blesscomn berhasil dihapus.');
+    }
+
+    /**
+     * Export daftar Pengurus Blesscomn ke CSV atau Excel.
+     */
+    public function export(Request $request)
+    {
+        $pengurus = $this->buildIndexQuery($request)->latest()->get();
+
+        return SimpleTableExporter::download(
+            'pengurus_blesscomn',
+            ['Tanggal Input', 'Nama Ketua', 'No. WA Ketua', 'Nama Asisten', 'No. WA Asisten', 'Wilayah', 'Pelayanan'],
+            $pengurus,
+            fn (PengurusBlesscomn $item) => [
+                optional($item->created_at)->format('Y-m-d'),
+                $item->nama_ketua,
+                $item->no_wa_ketua,
+                $item->nama_asisten,
+                $item->no_wa_asisten,
+                $item->wilayah->nama_wilayah ?? '-',
+                $item->pelayanan->nama_pelayanan ?? '-',
+            ],
+            $request->get('format', 'csv')
+        );
+    }
+
+    /**
+     * Query builder untuk daftar Pengurus Blesscomn.
+     */
+    private function buildIndexQuery(Request $request)
+    {
+        $query = PengurusBlesscomn::with(['wilayah', 'pelayanan']);
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        if ($request->filled('id_wilayah')) {
+            $query->where('id_wilayah', $request->id_wilayah);
+        }
+        if ($request->filled('id_pelayanan')) {
+            $query->where('id_pelayanan', $request->id_pelayanan);
+        }
+
+        $search = trim((string) $request->get('search', ''));
+        if ($search !== '') {
+            $query->where(function ($subQuery) use ($search) {
+                $subQuery->where('nama_ketua', 'like', "%{$search}%")
+                    ->orWhere('no_wa_ketua', 'like', "%{$search}%")
+                    ->orWhere('nama_asisten', 'like', "%{$search}%")
+                    ->orWhere('no_wa_asisten', 'like', "%{$search}%")
+                    ->orWhereHas('wilayah', fn ($relation) => $relation->where('nama_wilayah', 'like', "%{$search}%"))
+                    ->orWhereHas('pelayanan', fn ($relation) => $relation->where('nama_pelayanan', 'like', "%{$search}%"));
+            });
+        }
+
+        return $query;
     }
 }

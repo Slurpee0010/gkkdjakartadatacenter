@@ -16,6 +16,17 @@
     </a>
 </div>
 
+@include('partials.data-filters', [
+    'title' => 'Filter Laporan Blesscomn',
+    'actionRoute' => 'laporan_blesscomn.index',
+    'exportRoute' => 'laporan_blesscomn.export',
+    'resetRoute' => 'laporan_blesscomn.index',
+    'filterIdPrefix' => 'laporan_blesscomn',
+    'wilayahParam' => 'id_wilayah',
+    'pelayananParam' => 'id_pelayanan',
+    'searchPlaceholder' => 'Blesscomn, wilayah, pelayanan',
+])
+
 <div class="gkkd-card fade-in">
     <div class="gkkd-card-body" style="padding: 0;">
         @if($laporans->count() > 0)
@@ -75,7 +86,7 @@
         @else
         <div class="empty-state">
             <i class="fas fa-clipboard-list"></i>
-            <p>Belum ada data laporan blesscomn. Klik tombol "Input Laporan" untuk menambahkan.</p>
+            <p>Tidak ada laporan blesscomn sesuai filter atau search.</p>
         </div>
         @endif
     </div>

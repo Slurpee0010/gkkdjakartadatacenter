@@ -6,18 +6,21 @@ use App\Models\MasterBlesscomn;
 use App\Models\PengurusBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
 
 class MasterBlesscomnController extends Controller
 {
     // Menampilkan daftar master blesscomn
-    public function index()
+    public function index(Request $request)
     {
-        $blesscomns = MasterBlesscomn::with(['pengurus', 'wilayah', 'pelayanan', 'blesscomnInduk'])
+        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
+        $blesscomns = $this->buildIndexQuery($request)
             ->latest()
             ->get();
 
-        return view('master_blesscomn.index', compact('blesscomns'));
+        return view('master_blesscomn.index', compact('blesscomns', 'wilayahs', 'pelayanans'));
     }
 
     // Form untuk menambah master blesscomn baru
@@ -131,6 +134,68 @@ class MasterBlesscomnController extends Controller
 
         return redirect()->route('master_blesscomn.index')
             ->with('success', 'Master Blesscomn berhasil dihapus.');
+    }
+
+    /**
+     * Export daftar Master Blesscomn ke CSV atau Excel.
+     */
+    public function export(Request $request)
+    {
+        $blesscomns = $this->buildIndexQuery($request)->latest()->get();
+
+        return SimpleTableExporter::download(
+            'master_blesscomn',
+            ['Tanggal Terbentuk', 'Nama Blesscomn', 'Ketua', 'Asisten', 'Wilayah', 'Pelayanan', 'Pembelahan', 'Blesscomn Induk'],
+            $blesscomns,
+            fn (MasterBlesscomn $item) => [
+                optional($item->tanggal_terbentuk)->format('Y-m-d'),
+                $item->nama_blesscomn,
+                $item->pengurus->nama_ketua ?? '-',
+                $item->pengurus->nama_asisten ?? '-',
+                $item->wilayah->nama_wilayah ?? '-',
+                $item->pelayanan->nama_pelayanan ?? '-',
+                $item->is_pembelahan ? 'Ya' : 'Tidak',
+                $item->blesscomnInduk->nama_blesscomn ?? '-',
+            ],
+            $request->get('format', 'csv')
+        );
+    }
+
+    /**
+     * Query builder untuk daftar Master Blesscomn.
+     */
+    private function buildIndexQuery(Request $request)
+    {
+        $query = MasterBlesscomn::with(['pengurus', 'wilayah', 'pelayanan', 'blesscomnInduk']);
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('tanggal_terbentuk', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('tanggal_terbentuk', '<=', $request->date_to);
+        }
+        if ($request->filled('id_wilayah')) {
+            $query->where('id_wilayah', $request->id_wilayah);
+        }
+        if ($request->filled('id_pelayanan')) {
+            $query->where('id_pelayanan', $request->id_pelayanan);
+        }
+
+        $search = trim((string) $request->get('search', ''));
+        if ($search !== '') {
+            $query->where(function ($subQuery) use ($search) {
+                $subQuery->where('nama_blesscomn', 'like', "%{$search}%")
+                    ->orWhereHas('pengurus', function ($relation) use ($search) {
+                        $relation->where('nama_ketua', 'like', "%{$search}%")
+                            ->orWhere('nama_asisten', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('blesscomnInduk', fn ($relation) => $relation->where('nama_blesscomn', 'like', "%{$search}%"))
+                    ->orWhereHas('wilayah', fn ($relation) => $relation->where('nama_wilayah', 'like', "%{$search}%"))
+                    ->orWhereHas('pelayanan', fn ($relation) => $relation->where('nama_pelayanan', 'like', "%{$search}%"));
+            });
+        }
+
+        return $query;
     }
 
     // =========================================
