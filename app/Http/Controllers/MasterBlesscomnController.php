@@ -151,6 +151,26 @@ class MasterBlesscomnController extends Controller
             ->with('success', 'Master Blesscomn berhasil dihapus.');
     }
 
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $this->validatedIds($request);
+        $query = MasterBlesscomn::whereIn('id', $ids);
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+        $blesscomns = $query->get();
+
+        abort_if($blesscomns->count() !== count($ids), 403);
+
+        $blesscomns->each->delete();
+
+        $message = $blesscomns->count().' data Master Blesscomn berhasil dihapus.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('master_blesscomn.index')->with('success', $message);
+    }
+
     /**
      * Export daftar Master Blesscomn ke CSV atau Excel.
      */
@@ -239,6 +259,16 @@ class MasterBlesscomnController extends Controller
     private function dataScope(): DataScope
     {
         return app(DataScope::class);
+    }
+
+    private function validatedIds(Request $request): array
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', 'exists:master_blesscomns,id'],
+        ]);
+
+        return array_map('intval', $validated['ids']);
     }
 
     private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void

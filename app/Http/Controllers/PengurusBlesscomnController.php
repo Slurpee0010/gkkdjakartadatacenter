@@ -119,6 +119,26 @@ class PengurusBlesscomnController extends Controller
             ->with('success', 'Pengurus Blesscomn berhasil dihapus.');
     }
 
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $this->validatedIds($request);
+        $query = PengurusBlesscomn::whereIn('id', $ids);
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+        $pengurus = $query->get();
+
+        abort_if($pengurus->count() !== count($ids), 403);
+
+        $pengurus->each->delete();
+
+        $message = $pengurus->count().' data Pengurus Blesscomn berhasil dihapus.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('pengurus_blesscomn.index')->with('success', $message);
+    }
+
     /**
      * Export daftar Pengurus Blesscomn ke CSV atau Excel.
      */
@@ -183,6 +203,16 @@ class PengurusBlesscomnController extends Controller
     private function dataScope(): DataScope
     {
         return app(DataScope::class);
+    }
+
+    private function validatedIds(Request $request): array
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', 'exists:pengurus_blesscomns,id'],
+        ]);
+
+        return array_map('intval', $validated['ids']);
     }
 
     private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void

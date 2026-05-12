@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RbacSeeder::class);
+        $this->call(DataCoreSeeder::class);
 
         $pusat = Wilayah::firstOrCreate([
             'nama_wilayah' => env('SUPERADMIN_WILAYAH', 'Pusat'),

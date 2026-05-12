@@ -30,10 +30,24 @@
 <div class="gkkd-card fade-in">
     <div class="gkkd-card-body" style="padding: 0;">
         @if($pengurus->count() > 0)
+        <form method="POST" action="{{ route('pengurus_blesscomn.bulk-destroy') }}" class="bulk-delete-form" data-resource-label="Pengurus Blesscomn">
+            @csrf
+            @method('DELETE')
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3" style="border-bottom: 1px solid var(--border);">
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">
+                    <span class="bulk-selected-count">0</span> data dipilih
+                </div>
+                <button type="submit" class="btn-gkkd btn-sm-gkkd btn-delete-gkkd js-bulk-delete-button" disabled>
+                    <i class="fas fa-trash-alt"></i> Hapus Terpilih
+                </button>
+            </div>
         <div class="table-responsive">
             <table class="gkkd-table">
                 <thead>
                     <tr>
+                        <th style="width: 48px;">
+                            <input type="checkbox" class="form-check-input js-select-all" aria-label="Pilih semua pengurus blesscomn">
+                        </th>
                         <th style="width: 50px;">No</th>
                         <th>Nama Ketua</th>
                         <th>No. WA Ketua</th>
@@ -47,6 +61,9 @@
                 <tbody>
                     @foreach ($pengurus as $index => $item)
                     <tr>
+                        <td>
+                            <input type="checkbox" name="ids[]" value="{{ $item->id }}" class="form-check-input js-row-select" aria-label="Pilih {{ $item->nama_ketua }}">
+                        </td>
                         <td style="color: var(--text-muted); font-weight: 500;">{{ $index + 1 }}</td>
                         <td style="font-weight: 600;">{{ $item->nama_ketua }}</td>
                         <td>
@@ -79,6 +96,7 @@
                 </tbody>
             </table>
         </div>
+        </form>
         @else
         <div class="empty-state">
             <i class="fas fa-user-shield"></i>

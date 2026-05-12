@@ -1200,6 +1200,100 @@
                 }
             });
         });
+
+        function refreshBulkDeleteState(form) {
+            var $form = $(form);
+            var total = $form.find('.js-row-select').length;
+            var checked = $form.find('.js-row-select:checked').length;
+
+            $form.find('.bulk-selected-count').text(checked);
+            $form.find('.js-bulk-delete-button').prop('disabled', checked === 0);
+            $form.find('.js-select-all')
+                .prop('checked', total > 0 && checked === total)
+                .prop('indeterminate', checked > 0 && checked < total);
+        }
+
+        $(document).on('change', '.js-select-all', function() {
+            var form = $(this).closest('form.bulk-delete-form');
+            form.find('.js-row-select').prop('checked', this.checked);
+            refreshBulkDeleteState(form);
+        });
+
+        $(document).on('change', '.js-row-select', function() {
+            refreshBulkDeleteState($(this).closest('form.bulk-delete-form'));
+        });
+
+        $(document).on('submit', 'form.bulk-delete-form', function(e) {
+            e.preventDefault();
+
+            var form = $(this);
+            var selected = form.find('.js-row-select:checked');
+            var count = selected.length;
+            var label = form.data('resource-label') || 'data';
+
+            if (count === 0) {
+                Swal.fire({
+                    title: 'Belum ada data dipilih',
+                    text: 'Pilih minimal satu data terlebih dahulu.',
+                    icon: 'info',
+                    confirmButtonColor: '#2563eb'
+                });
+                return;
+            }
+
+            Swal.fire({
+                title: 'Hapus Data Terpilih?',
+                html: 'Apakah Anda yakin ingin menghapus <strong>' + count + '</strong> data ' + label + '?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: '<i class="fas fa-trash-alt"></i> Ya, Hapus!',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then(function(result) {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: form.attr('action'),
+                    type: 'POST',
+                    data: form.serialize(),
+                    dataType: 'json',
+                    success: function(res) {
+                        Swal.fire({
+                            title: 'Terhapus!',
+                            text: res.message || 'Data terpilih berhasil dihapus.',
+                            icon: 'success',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                        selected.closest('tr').fadeOut(400, function() {
+                            $(this).remove();
+                            refreshBulkDeleteState(form);
+
+                            if (form.find('.js-row-select').length === 0) {
+                                window.location.reload();
+                            }
+                        });
+                    },
+                    error: function(xhr) {
+                        var msg = 'Terjadi kesalahan saat menghapus data terpilih.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        Swal.fire({
+                            title: 'Gagal!',
+                            text: msg,
+                            icon: 'error',
+                            confirmButtonColor: '#2563eb'
+                        });
+                    }
+                });
+            });
+        });
     </script>
     @yield('scripts')
 </body>

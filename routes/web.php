@@ -105,6 +105,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     });
 
     Route::middleware('permission:pa,auto')->group(function () {
+        Route::delete('/pembimbing/bulk-delete', [PembimbingController::class, 'bulkDestroy'])->name('pembimbing.bulk-destroy');
+        Route::get('/pembimbing/export', [PembimbingController::class, 'export'])->name('pembimbing.export');
+        Route::delete('/anak_bimbingan/bulk-delete', [AnakBimbinganController::class, 'bulkDestroy'])->name('anak_bimbingan.bulk-destroy');
+        Route::get('/anak_bimbingan/export', [AnakBimbinganController::class, 'export'])->name('anak_bimbingan.export');
         Route::resource('pembimbing', PembimbingController::class);
         Route::resource('anak_bimbingan', AnakBimbinganController::class);
         Route::resource('laporan_pa', LaporanPaController::class);
@@ -121,6 +125,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     });
 
     Route::middleware('permission:blesscomn,auto')->group(function () {
+        Route::delete('/pengurus_blesscomn/bulk-delete', [PengurusBlesscomnController::class, 'bulkDestroy'])->name('pengurus_blesscomn.bulk-destroy');
+        Route::delete('/master_blesscomn/bulk-delete', [MasterBlesscomnController::class, 'bulkDestroy'])->name('master_blesscomn.bulk-destroy');
         Route::resource('pengurus_blesscomn', PengurusBlesscomnController::class);
         Route::resource('master_blesscomn', MasterBlesscomnController::class);
         Route::resource('laporan_blesscomn', LaporanBlesscomnController::class);
