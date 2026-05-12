@@ -2,7 +2,7 @@
 
 @section('title', 'Daftar Wilayah')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span>Wilayah
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span>Wilayah
 @endsection
 
 @section('content')

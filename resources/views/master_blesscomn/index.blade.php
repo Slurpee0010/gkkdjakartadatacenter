@@ -2,7 +2,7 @@
 
 @section('title', 'Daftar Master Blesscomn')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span>Master Blesscomn
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span>Master Blesscomn
 @endsection
 
 @section('content')

@@ -2,10 +2,15 @@
 
 @section('title', 'Tambah Master Blesscomn')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('master_blesscomn.index') }}">Master Blesscomn</a><span>/</span>Tambah
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('master_blesscomn.index') }}">Master Blesscomn</a><span>/</span>Tambah
 @endsection
 
 @section('content')
+@php
+    $regionalLocked = auth()->user()?->isAdminWilayah() ?? false;
+    $regionalWilayahId = auth()->user()?->wilayah_id;
+    $selectedWilayah = $regionalLocked ? $regionalWilayahId : old('id_wilayah');
+@endphp
 <style>
     .pengurus-inline-modal {
         position: fixed;
@@ -192,10 +197,15 @@
                         <div class="col-md-6">
                             <div class="gkkd-form-group">
                                 <label for="id_wilayah" class="gkkd-form-label">Wilayah</label>
-                                <select name="id_wilayah" id="id_wilayah" class="gkkd-form-control" required>
-                                    <option value="">— Pilih Wilayah —</option>
+                                @if($regionalLocked)
+                                    <input type="hidden" name="id_wilayah" value="{{ $regionalWilayahId }}">
+                                @endif
+                                <select name="id_wilayah" id="id_wilayah" class="gkkd-form-control" required @disabled($regionalLocked)>
+                                    @unless($regionalLocked)
+                                        <option value="">— Pilih Wilayah —</option>
+                                    @endunless
                                     @foreach ($wilayahs as $wilayah)
-                                        <option value="{{ $wilayah->id }}" {{ old('id_wilayah') == $wilayah->id ? 'selected' : '' }}>
+                                        <option value="{{ $wilayah->id }}" {{ (string) $selectedWilayah === (string) $wilayah->id ? 'selected' : '' }}>
                                             {{ $wilayah->nama_wilayah }}
                                         </option>
                                     @endforeach
@@ -334,10 +344,15 @@
                     <div class="col-md-6">
                         <div class="gkkd-form-group">
                             <label for="modal_id_wilayah" class="gkkd-form-label">Wilayah</label>
-                            <select name="id_wilayah" id="modal_id_wilayah" class="gkkd-form-control" required>
-                                <option value="">Pilih Wilayah</option>
+                            @if($regionalLocked)
+                                <input type="hidden" name="id_wilayah" value="{{ $regionalWilayahId }}">
+                            @endif
+                            <select name="id_wilayah" id="modal_id_wilayah" class="gkkd-form-control" required @disabled($regionalLocked)>
+                                @unless($regionalLocked)
+                                    <option value="">Pilih Wilayah</option>
+                                @endunless
                                 @foreach ($wilayahs as $wilayah)
-                                    <option value="{{ $wilayah->id }}">{{ $wilayah->nama_wilayah }}</option>
+                                    <option value="{{ $wilayah->id }}" {{ (string) $selectedWilayah === (string) $wilayah->id ? 'selected' : '' }}>{{ $wilayah->nama_wilayah }}</option>
                                 @endforeach
                             </select>
                             <div class="pengurus-field-error" data-pengurus-error-for="id_wilayah"></div>

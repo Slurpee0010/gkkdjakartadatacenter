@@ -2,7 +2,7 @@
 
 @section('title', 'Edit Buku PA')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('master_buku_pa.index') }}">Master Buku PA</a><span>/</span>Edit
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('master_buku_pa.index') }}">Master Buku PA</a><span>/</span>Edit
 @endsection
 
 @section('content')

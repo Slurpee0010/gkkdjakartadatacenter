@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PengurusBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Services\Rbac\DataScope;
 use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class PengurusBlesscomnController extends Controller
     // Menampilkan daftar pengurus blesscomn
     public function index(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $pengurus = $this->buildIndexQuery($request)->latest()->get();
 
@@ -21,9 +22,9 @@ class PengurusBlesscomnController extends Controller
     }
 
     // Form untuk menambah pengurus blesscomn baru
-    public function create()
+    public function create(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         return view('pengurus_blesscomn.create', compact('wilayahs', 'pelayanans'));
     }
@@ -31,6 +32,8 @@ class PengurusBlesscomnController extends Controller
     // Menyimpan pengurus blesscomn baru ke database
     public function store(Request $request)
     {
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $validated = $request->validate([
             'nama_ketua'    => 'required|string|max:255',
             'no_wa_ketua'   => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,10}$/'],
@@ -66,9 +69,11 @@ class PengurusBlesscomnController extends Controller
     }
 
     // Form untuk mengedit pengurus blesscomn
-    public function edit(PengurusBlesscomn $pengurusBlesscomn)
+    public function edit(Request $request, PengurusBlesscomn $pengurusBlesscomn)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $this->abortIfOutsideRegion($request, $pengurusBlesscomn->id_wilayah);
+
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         return view('pengurus_blesscomn.edit', compact('pengurusBlesscomn', 'wilayahs', 'pelayanans'));
     }
@@ -76,6 +81,9 @@ class PengurusBlesscomnController extends Controller
     // Mengupdate data pengurus blesscomn
     public function update(Request $request, PengurusBlesscomn $pengurusBlesscomn)
     {
+        $this->abortIfOutsideRegion($request, $pengurusBlesscomn->id_wilayah);
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $request->validate([
             'nama_ketua'    => 'required|string|max:255',
             'no_wa_ketua'   => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,10}$/'],
@@ -99,6 +107,8 @@ class PengurusBlesscomnController extends Controller
     // Soft delete pengurus blesscomn via AJAX
     public function destroy(PengurusBlesscomn $pengurusBlesscomn)
     {
+        $this->abortIfOutsideRegion(request(), $pengurusBlesscomn->id_wilayah);
+
         $pengurusBlesscomn->delete();
 
         if (request()->ajax()) {
@@ -153,6 +163,8 @@ class PengurusBlesscomnController extends Controller
             $query->where('id_pelayanan', $request->id_pelayanan);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+
         $search = trim((string) $request->get('search', ''));
         if ($search !== '') {
             $query->where(function ($subQuery) use ($search) {
@@ -166,5 +178,17 @@ class PengurusBlesscomnController extends Controller
         }
 
         return $query;
+    }
+
+    private function dataScope(): DataScope
+    {
+        return app(DataScope::class);
+    }
+
+    private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void
+    {
+        $scopedWilayahId = $this->dataScope()->scopedWilayahId($request->user());
+
+        abort_if($scopedWilayahId !== null && (int) $wilayahId !== $scopedWilayahId, 403);
     }
 }

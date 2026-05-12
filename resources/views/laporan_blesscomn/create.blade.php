@@ -2,10 +2,15 @@
 
 @section('title', 'Input Laporan Blesscomn')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('laporan_blesscomn.index') }}">Laporan Blesscomn</a><span>/</span>Input
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('laporan_blesscomn.index') }}">Laporan Blesscomn</a><span>/</span>Input
 @endsection
 
 @section('content')
+@php
+    $regionalLocked = auth()->user()?->isAdminWilayah() ?? false;
+    $regionalWilayahId = auth()->user()?->wilayah_id;
+    $selectedWilayah = $regionalLocked ? $regionalWilayahId : old('id_wilayah');
+@endphp
 <a href="{{ route('laporan_blesscomn.index') }}" class="back-link">
     <i class="fas fa-arrow-left"></i> Kembali ke Daftar Laporan
 </a>
@@ -34,10 +39,15 @@
                         <div class="col-md-6">
                             <div class="gkkd-form-group">
                                 <label for="id_wilayah" class="gkkd-form-label">Wilayah</label>
-                                <select name="id_wilayah" id="id_wilayah" class="gkkd-form-control" required>
-                                    <option value="">— Pilih Wilayah —</option>
+                                @if($regionalLocked)
+                                    <input type="hidden" name="id_wilayah" value="{{ $regionalWilayahId }}">
+                                @endif
+                                <select name="id_wilayah" id="id_wilayah" class="gkkd-form-control" required @disabled($regionalLocked)>
+                                    @unless($regionalLocked)
+                                        <option value="">— Pilih Wilayah —</option>
+                                    @endunless
                                     @foreach ($wilayahs as $wilayah)
-                                        <option value="{{ $wilayah->id }}" {{ old('id_wilayah') == $wilayah->id ? 'selected' : '' }}>
+                                        <option value="{{ $wilayah->id }}" {{ (string) $selectedWilayah === (string) $wilayah->id ? 'selected' : '' }}>
                                             {{ $wilayah->nama_wilayah }}
                                         </option>
                                     @endforeach

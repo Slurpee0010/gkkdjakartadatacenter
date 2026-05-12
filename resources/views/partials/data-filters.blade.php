@@ -4,6 +4,9 @@
     $searchPlaceholder = $searchPlaceholder ?? 'Cari data...';
     $title = $title ?? 'Filter Data';
     $filterIdPrefix = $filterIdPrefix ?? 'data_filter';
+    $regionalLocked = auth()->user()?->isAdminWilayah() ?? false;
+    $regionalWilayahId = auth()->user()?->wilayah_id;
+    $selectedWilayah = $regionalLocked ? $regionalWilayahId : request($wilayahParam);
 @endphp
 
 <div class="gkkd-card fade-in mb-4">
@@ -30,10 +33,15 @@
                 <div class="col-lg-3 col-md-6">
                     <div class="gkkd-form-group mb-0">
                         <label for="{{ $filterIdPrefix }}_wilayah" class="gkkd-form-label">Wilayah</label>
-                        <select name="{{ $wilayahParam }}" id="{{ $filterIdPrefix }}_wilayah" class="gkkd-form-control">
-                            <option value="">Semua Wilayah</option>
+                        @if($regionalLocked)
+                            <input type="hidden" name="{{ $wilayahParam }}" value="{{ $regionalWilayahId }}">
+                        @endif
+                        <select name="{{ $wilayahParam }}" id="{{ $filterIdPrefix }}_wilayah" class="gkkd-form-control" @disabled($regionalLocked)>
+                            @unless($regionalLocked)
+                                <option value="">Semua Wilayah</option>
+                            @endunless
                             @foreach ($wilayahs as $wilayah)
-                                <option value="{{ $wilayah->id }}" {{ request($wilayahParam) == $wilayah->id ? 'selected' : '' }}>
+                                <option value="{{ $wilayah->id }}" {{ (string) $selectedWilayah === (string) $wilayah->id ? 'selected' : '' }}>
                                     {{ $wilayah->nama_wilayah }}
                                 </option>
                             @endforeach

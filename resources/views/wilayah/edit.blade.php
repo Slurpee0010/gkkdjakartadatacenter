@@ -2,7 +2,7 @@
 
 @section('title', 'Edit Wilayah')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('wilayah.index') }}">Wilayah</a><span>/</span>Edit
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('wilayah.index') }}">Wilayah</a><span>/</span>Edit
 @endsection
 
 @section('content')

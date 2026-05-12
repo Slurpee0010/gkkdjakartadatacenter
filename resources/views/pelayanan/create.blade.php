@@ -2,7 +2,7 @@
 
 @section('title', 'Tambah Pelayanan')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('pelayanan.index') }}">Pelayanan</a><span>/</span>Tambah
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('pelayanan.index') }}">Pelayanan</a><span>/</span>Tambah
 @endsection
 
 @section('content')

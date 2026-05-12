@@ -6,8 +6,10 @@ use App\Models\LaporanBlesscomn;
 use App\Models\MasterBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Services\Rbac\DataScope;
 use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class LaporanBlesscomnController extends Controller
@@ -15,7 +17,7 @@ class LaporanBlesscomnController extends Controller
     // Menampilkan daftar laporan blesscomn
     public function index(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $laporans = $this->buildIndexQuery($request)
             ->latest('tanggal_pelaksanaan')
@@ -25,9 +27,9 @@ class LaporanBlesscomnController extends Controller
     }
 
     // Form untuk menambah laporan blesscomn baru
-    public function create()
+    public function create(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
 
         return view('laporan_blesscomn.create', compact('wilayahs', 'pelayanans'));
@@ -36,6 +38,8 @@ class LaporanBlesscomnController extends Controller
     // Menyimpan laporan blesscomn baru ke database
     public function store(Request $request)
     {
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $request->validate([
             'tanggal_pelaksanaan' => 'required|date|before_or_equal:' . Carbon::today()->toDateString(),
             'id_wilayah'          => 'required|exists:wilayahs,id',
@@ -48,6 +52,8 @@ class LaporanBlesscomnController extends Controller
         ], [
             'tanggal_pelaksanaan.before_or_equal' => 'Tanggal pelaksanaan tidak boleh lebih dari hari ini.',
         ]);
+
+        $this->validateBlesscomnRelation($request);
 
         $data = $request->only([
             'tanggal_pelaksanaan', 'id_wilayah', 'id_pelayanan', 'id_blesscomn',
@@ -65,9 +71,11 @@ class LaporanBlesscomnController extends Controller
     }
 
     // Form untuk mengedit laporan blesscomn
-    public function edit(LaporanBlesscomn $laporanBlesscomn)
+    public function edit(Request $request, LaporanBlesscomn $laporanBlesscomn)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $this->abortIfOutsideRegion($request, $laporanBlesscomn->id_wilayah);
+
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
 
         // Pre-load blesscomn list yang sesuai filter wilayah & pelayanan
@@ -84,6 +92,9 @@ class LaporanBlesscomnController extends Controller
     // Mengupdate data laporan blesscomn
     public function update(Request $request, LaporanBlesscomn $laporanBlesscomn)
     {
+        $this->abortIfOutsideRegion($request, $laporanBlesscomn->id_wilayah);
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $request->validate([
             'tanggal_pelaksanaan' => 'required|date|before_or_equal:' . Carbon::today()->toDateString(),
             'id_wilayah'          => 'required|exists:wilayahs,id',
@@ -96,6 +107,8 @@ class LaporanBlesscomnController extends Controller
         ], [
             'tanggal_pelaksanaan.before_or_equal' => 'Tanggal pelaksanaan tidak boleh lebih dari hari ini.',
         ]);
+
+        $this->validateBlesscomnRelation($request);
 
         $data = $request->only([
             'tanggal_pelaksanaan', 'id_wilayah', 'id_pelayanan', 'id_blesscomn',
@@ -114,6 +127,8 @@ class LaporanBlesscomnController extends Controller
     // Soft delete laporan blesscomn via AJAX
     public function destroy(LaporanBlesscomn $laporanBlesscomn)
     {
+        $this->abortIfOutsideRegion(request(), $laporanBlesscomn->id_wilayah);
+
         $laporanBlesscomn->delete();
 
         if (request()->ajax()) {
@@ -173,6 +188,8 @@ class LaporanBlesscomnController extends Controller
             $query->where('id_pelayanan', $request->id_pelayanan);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+
         $search = trim((string) $request->get('search', ''));
         if ($search !== '') {
             $query->where(function ($subQuery) use ($search) {
@@ -189,5 +206,30 @@ class LaporanBlesscomnController extends Controller
         }
 
         return $query;
+    }
+
+    private function dataScope(): DataScope
+    {
+        return app(DataScope::class);
+    }
+
+    private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void
+    {
+        $scopedWilayahId = $this->dataScope()->scopedWilayahId($request->user());
+
+        abort_if($scopedWilayahId !== null && (int) $wilayahId !== $scopedWilayahId, 403);
+    }
+
+    private function validateBlesscomnRelation(Request $request): void
+    {
+        $blesscomn = MasterBlesscomn::find($request->id_blesscomn);
+
+        if (! $blesscomn
+            || (int) $blesscomn->id_wilayah !== (int) $request->id_wilayah
+            || (int) $blesscomn->id_pelayanan !== (int) $request->id_pelayanan) {
+            throw ValidationException::withMessages([
+                'id_blesscomn' => 'Blesscomn tidak sesuai dengan wilayah dan pelayanan.',
+            ]);
+        }
     }
 }

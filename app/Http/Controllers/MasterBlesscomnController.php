@@ -6,15 +6,17 @@ use App\Models\MasterBlesscomn;
 use App\Models\PengurusBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Services\Rbac\DataScope;
 use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class MasterBlesscomnController extends Controller
 {
     // Menampilkan daftar master blesscomn
     public function index(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $blesscomns = $this->buildIndexQuery($request)
             ->latest()
@@ -24,9 +26,9 @@ class MasterBlesscomnController extends Controller
     }
 
     // Form untuk menambah master blesscomn baru
-    public function create()
+    public function create(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         // Pengurus dikirim beserta nama_asisten untuk UI logic auto-fill
         $pengurusList = PengurusBlesscomn::orderBy('nama_ketua')
@@ -41,6 +43,8 @@ class MasterBlesscomnController extends Controller
     // Menyimpan master blesscomn baru ke database
     public function store(Request $request)
     {
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $rules = [
             'nama_blesscomn'    => 'required|string|max:255',
             'tanggal_terbentuk' => 'required|date',
@@ -56,6 +60,8 @@ class MasterBlesscomnController extends Controller
         }
 
         $request->validate($rules);
+
+        $this->validateBlesscomnMasterRelations($request);
 
         $data = $request->only([
             'nama_blesscomn', 'tanggal_terbentuk', 'id_pengurus',
@@ -74,9 +80,11 @@ class MasterBlesscomnController extends Controller
     }
 
     // Form untuk mengedit master blesscomn
-    public function edit(MasterBlesscomn $masterBlesscomn)
+    public function edit(Request $request, MasterBlesscomn $masterBlesscomn)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $this->abortIfOutsideRegion($request, $masterBlesscomn->id_wilayah);
+
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $pengurusList = PengurusBlesscomn::orderBy('nama_ketua')
             ->get(['id', 'nama_ketua', 'nama_asisten']);
@@ -93,6 +101,9 @@ class MasterBlesscomnController extends Controller
     // Mengupdate data master blesscomn
     public function update(Request $request, MasterBlesscomn $masterBlesscomn)
     {
+        $this->abortIfOutsideRegion($request, $masterBlesscomn->id_wilayah);
+        $this->dataScope()->injectRegionIntoRequest($request, 'id_wilayah');
+
         $rules = [
             'nama_blesscomn'    => 'required|string|max:255',
             'tanggal_terbentuk' => 'required|date',
@@ -107,6 +118,8 @@ class MasterBlesscomnController extends Controller
         }
 
         $request->validate($rules);
+
+        $this->validateBlesscomnMasterRelations($request, $masterBlesscomn);
 
         $data = $request->only([
             'nama_blesscomn', 'tanggal_terbentuk', 'id_pengurus',
@@ -126,6 +139,8 @@ class MasterBlesscomnController extends Controller
     // Soft delete master blesscomn via AJAX
     public function destroy(MasterBlesscomn $masterBlesscomn)
     {
+        $this->abortIfOutsideRegion(request(), $masterBlesscomn->id_wilayah);
+
         $masterBlesscomn->delete();
 
         if (request()->ajax()) {
@@ -181,6 +196,8 @@ class MasterBlesscomnController extends Controller
             $query->where('id_pelayanan', $request->id_pelayanan);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+
         $search = trim((string) $request->get('search', ''));
         if ($search !== '') {
             $query->where(function ($subQuery) use ($search) {
@@ -212,8 +229,50 @@ class MasterBlesscomnController extends Controller
             $query->where('id_pelayanan', $request->id_pelayanan);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'id_wilayah');
+
         $blesscomns = $query->orderBy('nama_blesscomn')->get(['id', 'nama_blesscomn']);
 
         return response()->json($blesscomns);
+    }
+
+    private function dataScope(): DataScope
+    {
+        return app(DataScope::class);
+    }
+
+    private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void
+    {
+        $scopedWilayahId = $this->dataScope()->scopedWilayahId($request->user());
+
+        abort_if($scopedWilayahId !== null && (int) $wilayahId !== $scopedWilayahId, 403);
+    }
+
+    private function validateBlesscomnMasterRelations(Request $request, ?MasterBlesscomn $current = null): void
+    {
+        $pengurus = PengurusBlesscomn::find($request->id_pengurus);
+
+        if (! $pengurus
+            || (int) $pengurus->id_wilayah !== (int) $request->id_wilayah
+            || (int) $pengurus->id_pelayanan !== (int) $request->id_pelayanan) {
+            throw ValidationException::withMessages([
+                'id_pengurus' => 'Pengurus tidak sesuai dengan wilayah dan pelayanan.',
+            ]);
+        }
+
+        if (! $request->boolean('is_pembelahan')) {
+            return;
+        }
+
+        $parent = MasterBlesscomn::find($request->id_blesscomn_induk);
+
+        if (! $parent
+            || $parent->id === $current?->id
+            || (int) $parent->id_wilayah !== (int) $request->id_wilayah
+            || (int) $parent->id_pelayanan !== (int) $request->id_pelayanan) {
+            throw ValidationException::withMessages([
+                'id_blesscomn_induk' => 'Blesscomn induk tidak sesuai dengan wilayah dan pelayanan.',
+            ]);
+        }
     }
 }

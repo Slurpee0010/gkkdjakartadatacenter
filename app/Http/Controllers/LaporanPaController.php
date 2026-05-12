@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\LaporanPa;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
 use App\Models\Pembimbing;
 use App\Models\AnakBimbingan;
 use App\Models\MasterBukuPa;
+use App\Services\Audit\AuditLogger;
+use App\Services\Rbac\DataScope;
 use App\Support\Exports\SimpleTableExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class LaporanPaController extends Controller
@@ -40,7 +44,7 @@ class LaporanPaController extends Controller
     // Menampilkan daftar laporan PA
     public function index(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $laporanPas = $this->buildIndexQuery($request)
             ->latest('tanggal_pa')
@@ -50,11 +54,11 @@ class LaporanPaController extends Controller
     }
 
     // Form untuk menambah laporan PA baru
-    public function create()
+    public function create(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
-        $bukuPas = MasterBukuPa::orderBy('nama_buku')->get();
+        $bukuPas = MasterBukuPa::approved()->orderBy('nama_buku')->get();
 
         return view('laporan_pa.create', compact('wilayahs', 'pelayanans', 'bukuPas'));
     }
@@ -66,6 +70,8 @@ class LaporanPaController extends Controller
      */
     public function store(Request $request)
     {
+        $this->dataScope()->injectRegionIntoRequest($request, 'wilayah_id');
+
         // Sanitasi: ubah 'lainnya' menjadi null sebelum validasi
         if ($request->buku_pa_id === 'lainnya') {
             $request->merge(['buku_pa_id' => null]);
@@ -76,7 +82,7 @@ class LaporanPaController extends Controller
             'pelayanan_id'  => 'required|exists:pelayanans,id',
             'pembimbing_id' => 'required|exists:pembimbings,id',
             'anak_pa_ids'   => 'required|array|min:1',               // Ticket 2: array
-            'anak_pa_ids.*' => 'required|exists:anak_bimbingans,id', // Ticket 2: tiap elemen valid
+            'anak_pa_ids.*' => 'required|distinct|exists:anak_bimbingans,id', // Ticket 2: tiap elemen valid
             'buku_pa_id'    => 'nullable|exists:master_buku_pas,id', // Ticket 1: nullable
             'bab'           => 'required|integer|min:1',
             'tanggal_pa'    => 'required|date|before_or_equal:' . Carbon::today()->toDateString(),
@@ -93,6 +99,8 @@ class LaporanPaController extends Controller
             'anak_pa_ids.required'       => 'Pilih minimal 1 anak PA.',
             'anak_pa_ids.min'            => 'Pilih minimal 1 anak PA.',
         ]);
+
+        $this->validatePaRelations($request, $request->anak_pa_ids);
 
         // Siapkan data shared (sama untuk semua anak PA)
         $sharedData = [
@@ -121,16 +129,29 @@ class LaporanPaController extends Controller
         LaporanPa::insert($rows);
 
         $count = count($anakPaIds);
+        app(AuditLogger::class)->log(AuditLog::EVENT_CREATED, [
+            'module' => 'pa',
+            'auditable_type' => LaporanPa::class,
+            'auditable_label' => "Batch Laporan PA ({$count} anak)",
+            'new_values' => $sharedData,
+            'metadata' => [
+                'created_count' => $count,
+                'anak_pa_ids' => array_values($anakPaIds),
+            ],
+        ]);
+
         return redirect()->route('laporan_pa.index')
             ->with('success', "Laporan PA berhasil disimpan untuk {$count} anak PA.");
     }
 
     // Form untuk mengedit laporan PA
-    public function edit(LaporanPa $laporanPa)
+    public function edit(Request $request, LaporanPa $laporanPa)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $this->abortIfOutsideRegion($request, $laporanPa->wilayah_id);
+
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
-        $bukuPas = MasterBukuPa::orderBy('nama_buku')->get();
+        $bukuPas = MasterBukuPa::approved()->orderBy('nama_buku')->get();
 
         // Pre-load pembimbing & anak PA untuk form edit
         $pembimbings = Pembimbing::where('wilayah_id', $laporanPa->wilayah_id)
@@ -149,6 +170,9 @@ class LaporanPaController extends Controller
      */
     public function update(Request $request, LaporanPa $laporanPa)
     {
+        $this->abortIfOutsideRegion($request, $laporanPa->wilayah_id);
+        $this->dataScope()->injectRegionIntoRequest($request, 'wilayah_id');
+
         // Sanitasi: ubah 'lainnya' menjadi null
         if ($request->buku_pa_id === 'lainnya') {
             $request->merge(['buku_pa_id' => null]);
@@ -173,6 +197,8 @@ class LaporanPaController extends Controller
             'buku_pa_lainnya.required'   => 'Nama buku PA wajib diisi jika memilih "Lainnya".',
         ]);
 
+        $this->validatePaRelations($request, [$request->anak_pa_id]);
+
         $data = $request->only([
             'wilayah_id', 'pelayanan_id', 'pembimbing_id', 'anak_pa_id', 'bab', 'tanggal_pa'
         ]);
@@ -191,6 +217,8 @@ class LaporanPaController extends Controller
      */
     public function destroy(LaporanPa $laporanPa)
     {
+        $this->abortIfOutsideRegion(request(), $laporanPa->wilayah_id);
+
         $laporanPa->delete(); // Soft delete
 
         if (request()->ajax()) {
@@ -219,6 +247,8 @@ class LaporanPaController extends Controller
             $query->where('pelayanan_id', $request->pelayanan_id);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'wilayah_id');
+
         $pembimbings = $query->orderBy('nama_pembimbing')->get(['id', 'nama_pembimbing']);
 
         return response()->json($pembimbings);
@@ -235,6 +265,8 @@ class LaporanPaController extends Controller
             $query->where('pembimbing_id', $request->pembimbing_id);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'wilayah_id');
+
         $anakPas = $query->orderBy('nama_anak')->get(['id', 'nama_anak']);
 
         return response()->json($anakPas);
@@ -249,7 +281,7 @@ class LaporanPaController extends Controller
      */
     public function report(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
         $reportData = null;
 
@@ -379,6 +411,8 @@ class LaporanPaController extends Controller
             $query->where('pelayanan_id', $request->pelayanan_id);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'wilayah_id');
+
         $search = trim((string) $request->get('search', ''));
         if ($search !== '') {
             $query->where(function ($subQuery) use ($search) {
@@ -424,6 +458,8 @@ class LaporanPaController extends Controller
             $query->where('laporan_pas.pelayanan_id', $request->pelayanan_id);
         }
 
+        $this->dataScope()->applyToRequestQuery($query, $request, 'laporan_pas.wilayah_id');
+
         $search = trim((string) $request->get('search', ''));
         if ($search !== '') {
             $query->where(function ($subQuery) use ($search) {
@@ -452,5 +488,42 @@ class LaporanPaController extends Controller
             ->get();
 
         return $results;
+    }
+
+    private function dataScope(): DataScope
+    {
+        return app(DataScope::class);
+    }
+
+    private function abortIfOutsideRegion(Request $request, int|string|null $wilayahId): void
+    {
+        $scopedWilayahId = $this->dataScope()->scopedWilayahId($request->user());
+
+        abort_if($scopedWilayahId !== null && (int) $wilayahId !== $scopedWilayahId, 403);
+    }
+
+    private function validatePaRelations(Request $request, array $anakPaIds): void
+    {
+        $pembimbing = Pembimbing::find($request->pembimbing_id);
+
+        if (! $pembimbing
+            || (int) $pembimbing->wilayah_id !== (int) $request->wilayah_id
+            || (int) $pembimbing->pelayanan_id !== (int) $request->pelayanan_id) {
+            throw ValidationException::withMessages([
+                'pembimbing_id' => 'Pembimbing tidak sesuai dengan wilayah dan pelayanan.',
+            ]);
+        }
+
+        $validAnakCount = AnakBimbingan::whereIn('id', $anakPaIds)
+            ->where('pembimbing_id', $request->pembimbing_id)
+            ->where('wilayah_id', $request->wilayah_id)
+            ->where('pelayanan_id', $request->pelayanan_id)
+            ->count();
+
+        if ($validAnakCount !== count($anakPaIds)) {
+            throw ValidationException::withMessages([
+                'anak_pa_id' => 'Ada anak PA yang tidak sesuai dengan pembimbing, wilayah, atau pelayanan.',
+            ]);
+        }
     }
 }

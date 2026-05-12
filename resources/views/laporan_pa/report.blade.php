@@ -2,7 +2,7 @@
 
 @section('title', 'Report Keaktifan PA')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('laporan_pa.index') }}">Laporan PA</a><span>/</span>Report
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('laporan_pa.index') }}">Laporan PA</a><span>/</span>Report
 @endsection
 
 @section('content')

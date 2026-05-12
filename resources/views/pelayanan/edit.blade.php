@@ -2,7 +2,7 @@
 
 @section('title', 'Edit Pelayanan')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('pelayanan.index') }}">Pelayanan</a><span>/</span>Edit
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span><a href="{{ route('pelayanan.index') }}">Pelayanan</a><span>/</span>Edit
 @endsection
 
 @section('content')

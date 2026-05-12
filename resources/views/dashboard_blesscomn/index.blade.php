@@ -2,10 +2,15 @@
 
 @section('title', 'Dashboard Blesscomn')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span>Dashboard Blesscomn
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span>Dashboard Blesscomn
 @endsection
 
 @section('content')
+@php
+    $regionalLocked = auth()->user()?->isAdminWilayah() ?? false;
+    $regionalWilayahId = auth()->user()?->wilayah_id;
+    $selectedWilayah = $regionalLocked ? $regionalWilayahId : $filterWilayah;
+@endphp
 <div class="page-header mb-4">
     <h1 class="page-title"><i class="fas fa-chart-line me-2" style="color: var(--accent);"></i>Dashboard & Analytics Blesscomn</h1>
     <p class="page-subtitle">Ringkasan data dan performa blesscomn gereja</p>
@@ -17,10 +22,15 @@
         <form method="GET" action="{{ route('dashboard_blesscomn') }}" class="d-flex flex-wrap align-items-end gap-3">
             <div style="min-width: 180px;">
                 <label class="gkkd-form-label" style="margin-bottom: 4px;">Wilayah</label>
-                <select name="id_wilayah" class="gkkd-form-control">
-                    <option value="">Semua Wilayah</option>
+                @if($regionalLocked)
+                    <input type="hidden" name="id_wilayah" value="{{ $regionalWilayahId }}">
+                @endif
+                <select name="id_wilayah" class="gkkd-form-control" @disabled($regionalLocked)>
+                    @unless($regionalLocked)
+                        <option value="">Semua Wilayah</option>
+                    @endunless
                     @foreach($wilayahs as $w)
-                        <option value="{{ $w->id }}" {{ $filterWilayah == $w->id ? 'selected' : '' }}>{{ $w->nama_wilayah }}</option>
+                        <option value="{{ $w->id }}" {{ (string) $selectedWilayah === (string) $w->id ? 'selected' : '' }}>{{ $w->nama_wilayah }}</option>
                     @endforeach
                 </select>
             </div>

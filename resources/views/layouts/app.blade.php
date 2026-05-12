@@ -153,6 +153,48 @@
             opacity: 1;
         }
 
+        .sidebar-nav-group {
+            margin-bottom: 2px;
+        }
+
+        .sidebar-nav-toggle {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+        }
+
+        .sidebar-nav-toggle .fa-chevron-down {
+            margin-left: auto;
+            font-size: 0.72rem;
+            transition: transform 0.2s ease;
+        }
+
+        .sidebar-nav-group.open .sidebar-nav-toggle {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
+        .sidebar-nav-group.open .sidebar-nav-toggle .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        .sidebar-nav-submenu {
+            display: none;
+            padding: 2px 0 8px 28px;
+        }
+
+        .sidebar-nav-group.open .sidebar-nav-submenu {
+            display: block;
+        }
+
+        .sidebar-nav-submenu .sidebar-nav-item {
+            padding: 9px 14px;
+            font-size: 0.82rem;
+        }
+
         .sidebar-nav-badge {
             margin-left: auto;
             background: rgba(255,255,255,0.15);
@@ -263,6 +305,32 @@
         .header-date i {
             margin-right: 6px;
             color: var(--accent);
+        }
+
+        .header-notification {
+            position: relative;
+            min-width: 38px;
+            height: 38px;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .notification-dot {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: var(--danger);
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--surface-card);
         }
 
         /* ========== PAGE CONTENT ========== */
@@ -575,6 +643,18 @@
             border: 1px solid rgba(239, 68, 68, 0.15);
         }
 
+        .gkkd-alert-notification {
+            background: rgba(59, 130, 246, 0.08);
+            color: #1e3a8a;
+            border: 1px solid rgba(59, 130, 246, 0.16);
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .gkkd-alert-notification strong {
+            color: #172554;
+        }
+
         /* ========== BADGE ========== */
         .gkkd-badge {
             display: inline-flex;
@@ -717,71 +797,189 @@
         </div>
 
         <nav class="sidebar-nav">
+            @php
+                $laporanPaOpen = request()->is('pembimbing*')
+                    || request()->is('anak_bimbingan*')
+                    || request()->is('laporan_pa*')
+                    || request()->is('laporan-pa/report*');
+
+                $blesscomnOpen = request()->is('pengurus_blesscomn*')
+                    || request()->is('master_blesscomn*')
+                    || request()->is('laporan_blesscomn*');
+
+                $masterDataOpen = request()->is('pelayanan*') || request()->is('wilayah*') || request()->is('master_buku_pa*');
+                $currentUser = auth()->user();
+                $canPa = $currentUser?->hasPermissionTo('pa', 'read') ?? false;
+                $canBlesscomn = $currentUser?->hasPermissionTo('blesscomn', 'read') ?? false;
+                $canKehadiran = $currentUser?->hasPermissionTo('kehadiran_ibadah', 'read') ?? false;
+                $canMasterData = $currentUser?->hasPermissionTo('master_data', 'read') ?? false;
+                $canMasterBukuPa = $currentUser?->hasPermissionTo('master_buku_pa', 'read') ?? false;
+                $canUsers = $currentUser?->hasPermissionTo('users', 'read') ?? false;
+                $canNotifications = $currentUser?->hasPermissionTo('notifications', 'read') ?? false;
+                $canAuditLogs = $currentUser?->hasPermissionTo('audit_logs', 'read') ?? false;
+                $visibleNotifications = collect();
+                $latestNotification = null;
+
+                if ($canNotifications && $currentUser?->role) {
+                    $visibleNotifications = \App\Models\AppNotification::with('sender')
+                        ->where(function ($query) use ($currentUser) {
+                            $query->where('target_user_id', $currentUser->id)
+                                ->orWhereJsonContains('target_roles', $currentUser->role->name);
+                        })
+                        ->latest('sent_at')
+                        ->limit(5)
+                        ->get();
+                    $latestNotification = $visibleNotifications->first();
+                }
+            @endphp
+
             <div class="sidebar-nav-label">Menu Utama</div>
 
-            <a href="{{ url('/dashboard') }}" class="sidebar-nav-item {{ request()->is('dashboard') || request()->is('/') ? 'active' : '' }}">
-                <i class="fas fa-th-large"></i>
-                Dashboard
+            @if($canPa)
+                <a href="{{ route('dashboard') }}" class="sidebar-nav-item {{ request()->is('dashboard-pa') || request()->is('/') ? 'active' : '' }}">
+                    <i class="fas fa-th-large"></i>
+                    Dashboard Laporan PA
+                </a>
+            @endif
+
+            @if($canBlesscomn)
+                <a href="{{ route('dashboard_blesscomn') }}" class="sidebar-nav-item {{ request()->is('dashboard-blesscomn*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard Blesscomn
+                </a>
+            @endif
+
+            @if($canKehadiran)
+                <a href="{{ route('dashboard_kehadiran_ibadah') }}" class="sidebar-nav-item {{ request()->is('dashboard-kehadiran-ibadah*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-area"></i>
+                    Dashboard Ibadah
+                </a>
+            @endif
+
+            @if($canPa)
+                <div class="sidebar-nav-group {{ $laporanPaOpen ? 'open' : '' }}">
+                    <button type="button" class="sidebar-nav-item sidebar-nav-toggle" onclick="toggleSidebarGroup(this)">
+                        <i class="fas fa-file-alt"></i>
+                        Laporan PA
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="sidebar-nav-submenu">
+                        <a href="{{ route('pembimbing.index') }}" class="sidebar-nav-item {{ request()->is('pembimbing*') ? 'active' : '' }}">
+                            <i class="fas fa-user-tie"></i>
+                            Pembimbing
+                        </a>
+
+                        <a href="{{ route('anak_bimbingan.index') }}" class="sidebar-nav-item {{ request()->is('anak_bimbingan*') ? 'active' : '' }}">
+                            <i class="fas fa-users"></i>
+                            Anak PA
+                        </a>
+
+                        <a href="{{ route('laporan_pa.index') }}" class="sidebar-nav-item {{ request()->is('laporan_pa*') && !request()->is('laporan-pa/report*') ? 'active' : '' }}">
+                            <i class="fas fa-clipboard-list"></i>
+                            Laporan PA
+                        </a>
+
+                        <a href="{{ route('laporan_pa.report') }}" class="sidebar-nav-item {{ request()->is('laporan-pa/report*') ? 'active' : '' }}">
+                            <i class="fas fa-chart-bar"></i>
+                            Report Keaktifan
+                        </a>
+                    </div>
+                </div>
+            @endif
+
+            @if($canBlesscomn)
+                <div class="sidebar-nav-group {{ $blesscomnOpen ? 'open' : '' }}">
+                    <button type="button" class="sidebar-nav-item sidebar-nav-toggle" onclick="toggleSidebarGroup(this)">
+                        <i class="fas fa-church"></i>
+                        Blesscomn
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="sidebar-nav-submenu">
+                        <a href="{{ route('pengurus_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('pengurus_blesscomn*') ? 'active' : '' }}">
+                            <i class="fas fa-user-shield"></i>
+                            Pengurus Blesscomn
+                        </a>
+
+                        <a href="{{ route('master_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('master_blesscomn*') ? 'active' : '' }}">
+                            <i class="fas fa-church"></i>
+                            Master Blesscomn
+                        </a>
+
+                        <a href="{{ route('laporan_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('laporan_blesscomn*') ? 'active' : '' }}">
+                            <i class="fas fa-clipboard-list"></i>
+                            Laporan Blesscomn
+                        </a>
+                    </div>
+                </div>
+            @endif
+
+            @if($canKehadiran)
+                <a href="{{ route('kehadiran_ibadah.index') }}" class="sidebar-nav-item {{ request()->is('kehadiran_ibadah*') ? 'active' : '' }}">
+                    <i class="fas fa-calendar-check"></i>
+                    Kehadiran Ibadah
+                </a>
+            @endif
+
+            @if($canMasterData || $canMasterBukuPa)
+                <div class="sidebar-nav-group {{ $masterDataOpen ? 'open' : '' }}">
+                    <button type="button" class="sidebar-nav-item sidebar-nav-toggle" onclick="toggleSidebarGroup(this)">
+                        <i class="fas fa-database"></i>
+                        Master Data
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="sidebar-nav-submenu">
+                        @if($canMasterData)
+                            <a href="{{ route('pelayanan.index') }}" class="sidebar-nav-item {{ request()->is('pelayanan*') ? 'active' : '' }}">
+                                <i class="fas fa-hand-holding-heart"></i>
+                                Pelayanan
+                            </a>
+
+                            <a href="{{ route('wilayah.index') }}" class="sidebar-nav-item {{ request()->is('wilayah*') ? 'active' : '' }}">
+                                <i class="fas fa-map-marked-alt"></i>
+                                Wilayah
+                            </a>
+                        @endif
+
+                        @if($canMasterBukuPa)
+                            <a href="{{ route('master_buku_pa.index') }}" class="sidebar-nav-item {{ request()->is('master_buku_pa*') ? 'active' : '' }}">
+                                <i class="fas fa-book"></i>
+                                Master Buku PA
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
+            <div class="sidebar-nav-label">Akun</div>
+
+            @if($canUsers)
+                <a href="{{ route('users.index') }}" class="sidebar-nav-item {{ request()->is('users*') ? 'active' : '' }}">
+                    <i class="fas fa-users-cog"></i>
+                    Manajemen User
+                </a>
+            @endif
+
+            @if($canNotifications)
+                <a href="{{ route('notifications.index') }}" class="sidebar-nav-item {{ request()->is('inbox*') ? 'active' : '' }}">
+                    <i class="fas fa-inbox"></i>
+                    Inbox Broadcast
+                    @if($visibleNotifications->count() > 0)
+                        <span class="sidebar-nav-badge">{{ $visibleNotifications->count() }}</span>
+                    @endif
+                </a>
+            @endif
+
+            <a href="{{ route('password.edit') }}" class="sidebar-nav-item {{ request()->is('password') ? 'active' : '' }}">
+                <i class="fas fa-key"></i>
+                Ganti Password
             </a>
 
-            <a href="{{ route('wilayah.index') }}" class="sidebar-nav-item {{ request()->is('wilayah*') ? 'active' : '' }}">
-                <i class="fas fa-map-marked-alt"></i>
-                Wilayah
-            </a>
-
-            <a href="{{ route('pelayanan.index') }}" class="sidebar-nav-item {{ request()->is('pelayanan*') ? 'active' : '' }}">
-                <i class="fas fa-hand-holding-heart"></i>
-                Pelayanan
-            </a>
-
-            <a href="{{ route('pembimbing.index') }}" class="sidebar-nav-item {{ request()->is('pembimbing*') ? 'active' : '' }}">
-                <i class="fas fa-user-tie"></i>
-                Pembimbing
-            </a>
-
-            <a href="{{ route('anak_bimbingan.index') }}" class="sidebar-nav-item {{ request()->is('anak_bimbingan*') ? 'active' : '' }}">
-                <i class="fas fa-users"></i>
-                Anak Bimbingan
-            </a>
-
-            <div class="sidebar-nav-label">Laporan PA</div>
-
-            <a href="{{ route('master_buku_pa.index') }}" class="sidebar-nav-item {{ request()->is('master_buku_pa*') ? 'active' : '' }}">
-                <i class="fas fa-book"></i>
-                Master Buku PA
-            </a>
-
-            <a href="{{ route('laporan_pa.index') }}" class="sidebar-nav-item {{ request()->is('laporan_pa*') && !request()->is('laporan-pa/report*') ? 'active' : '' }}">
-                <i class="fas fa-file-alt"></i>
-                Laporan PA
-            </a>
-
-            <a href="{{ route('laporan_pa.report') }}" class="sidebar-nav-item {{ request()->is('laporan-pa/report*') ? 'active' : '' }}">
-                <i class="fas fa-chart-bar"></i>
-                Report Keaktifan
-            </a>
-
-            <div class="sidebar-nav-label">Blesscomn</div>
-
-            <a href="{{ route('pengurus_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('pengurus_blesscomn*') ? 'active' : '' }}">
-                <i class="fas fa-user-shield"></i>
-                Pengurus Blesscomn
-            </a>
-
-            <a href="{{ route('master_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('master_blesscomn*') ? 'active' : '' }}">
-                <i class="fas fa-church"></i>
-                Master Blesscomn
-            </a>
-
-            <a href="{{ route('laporan_blesscomn.index') }}" class="sidebar-nav-item {{ request()->is('laporan_blesscomn*') ? 'active' : '' }}">
-                <i class="fas fa-clipboard-list"></i>
-                Laporan Blesscomn
-            </a>
-
-            <a href="{{ route('dashboard_blesscomn') }}" class="sidebar-nav-item {{ request()->is('dashboard-blesscomn*') ? 'active' : '' }}">
-                <i class="fas fa-chart-line"></i>
-                Dashboard Blesscomn
-            </a>
+            @if($canAuditLogs)
+                <a href="{{ route('audit_logs.index') }}" class="sidebar-nav-item {{ request()->is('audit-logs*') ? 'active' : '' }}">
+                    <i class="fas fa-shield-alt"></i>
+                    System Event Log
+                </a>
+            @endif
         </nav>
 
         <div class="sidebar-footer">
@@ -798,7 +996,7 @@
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="header-breadcrumb">
-                    <a href="{{ url('/dashboard') }}">GKKD</a>
+                    <a href="{{ route('dashboard') }}">GKKD</a>
                     <span>/</span>
                     @yield('breadcrumb', 'Dashboard')
                 </div>
@@ -808,11 +1006,76 @@
                     <i class="far fa-calendar-alt"></i>
                     {{ \Carbon\Carbon::now()->locale('id')->translatedFormat('l, d F Y') }}
                 </div>
+                @auth
+                    @if($canNotifications)
+                        <a href="{{ route('notifications.index') }}" class="btn-gkkd btn-sm-gkkd btn-outline-gkkd header-notification" title="Inbox Broadcast">
+                            <i class="fas fa-bell"></i>
+                            @if($visibleNotifications->count() > 0)
+                                <span class="notification-dot">{{ $visibleNotifications->count() }}</span>
+                            @endif
+                        </a>
+                    @endif
+                    <div class="header-date" title="{{ auth()->user()->email }}">
+                        <i class="fas fa-user-shield"></i>
+                        {{ auth()->user()->name }}
+                        @if(auth()->user()->role)
+                            <span style="color: var(--text-muted);">({{ auth()->user()->role->label }})</span>
+                        @endif
+                        @if(session('impersonator_id'))
+                            <span style="color: var(--warning); font-weight: 700;">Mode Impersonate</span>
+                        @endif
+                    </div>
+                    <form action="{{ route('logout') }}" method="POST" class="m-0">
+                        @csrf
+                        <button type="submit" class="btn-gkkd btn-sm-gkkd btn-outline-gkkd">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Keluar
+                        </button>
+                    </form>
+                @endauth
             </div>
         </header>
 
         <!-- Page Content -->
         <main class="gkkd-content">
+            @if(session('impersonator_id'))
+                <div class="gkkd-alert" style="background: rgba(245, 158, 11, 0.1); color: #92400e; border: 1px solid rgba(245, 158, 11, 0.22); justify-content: space-between; align-items: center;">
+                    <div>
+                        <i class="fas fa-user-secret"></i>
+                        Anda sedang melihat sistem sebagai {{ auth()->user()->name }}. Superadmin asal: {{ session('impersonator_name') }}.
+                    </div>
+                    <form action="{{ route('impersonate.stop') }}" method="POST" class="m-0">
+                        @csrf
+                        <button type="submit" class="btn-gkkd btn-sm-gkkd btn-outline-gkkd">
+                            <i class="fas fa-undo"></i>
+                            Kembali
+                        </button>
+                    </form>
+                </div>
+            @endif
+
+            @if($latestNotification)
+                <div class="gkkd-alert gkkd-alert-notification" id="newNotificationAlert" data-notification-id="{{ $latestNotification->id }}" style="display: none;">
+                    <div>
+                        <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Pesan Baru</div>
+                        <strong>{{ $latestNotification->title }}</strong>
+                        <div style="margin-top: 4px;">{{ \Illuminate\Support\Str::limit($latestNotification->message, 180) }}</div>
+                        <div style="font-size: 0.76rem; color: #475569; margin-top: 6px;">
+                            Dari {{ $latestNotification->sender?->name ?? 'System' }} - {{ optional($latestNotification->sent_at)->diffForHumans() }}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('notifications.index') }}" class="btn-gkkd btn-sm-gkkd btn-outline-gkkd">
+                            <i class="fas fa-inbox"></i>
+                            Buka
+                        </a>
+                        <button type="button" class="btn-gkkd btn-sm-gkkd btn-outline-gkkd" onclick="dismissNotificationAlert({{ $latestNotification->id }})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            @endif
+
             @if(session('success'))
                 <div class="gkkd-alert gkkd-alert-success">
                     <i class="fas fa-check-circle"></i>
@@ -849,6 +1112,32 @@
             sidebar.classList.toggle('open');
             overlay.classList.toggle('show');
         }
+
+        function toggleSidebarGroup(button) {
+            button.closest('.sidebar-nav-group').classList.toggle('open');
+        }
+
+        function dismissNotificationAlert(notificationId) {
+            localStorage.setItem('gkkd:last-dismissed-notification-id', String(notificationId));
+            const alert = document.getElementById('newNotificationAlert');
+            if (alert) {
+                alert.style.display = 'none';
+            }
+        }
+
+        (function showNewNotificationAlert() {
+            const alert = document.getElementById('newNotificationAlert');
+            if (!alert) {
+                return;
+            }
+
+            const notificationId = Number(alert.dataset.notificationId || 0);
+            const dismissedId = Number(localStorage.getItem('gkkd:last-dismissed-notification-id') || 0);
+
+            if (notificationId > dismissedId) {
+                alert.style.display = 'flex';
+            }
+        })();
 
         // Close sidebar on window resize if desktop
         window.addEventListener('resize', function() {

@@ -20,4 +20,10 @@ class Pembimbing extends Model
     {
         return $this->belongsTo(Pelayanan::class);  // Pembimbing memiliki Pelayanan
     }
+
+    // Relasi ke Anak Bimbingan
+    public function anakBimbingans()
+    {
+        return $this->hasMany(AnakBimbingan::class);
+    }
 }

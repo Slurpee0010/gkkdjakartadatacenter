@@ -6,6 +6,7 @@ use App\Models\MasterBlesscomn;
 use App\Models\LaporanBlesscomn;
 use App\Models\Wilayah;
 use App\Models\Pelayanan;
+use App\Services\Rbac\DataScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -27,7 +28,7 @@ class DashboardBlesscomnController extends Controller
      */
     public function index(Request $request)
     {
-        $wilayahs = Wilayah::orderBy('nama_wilayah')->get();
+        $wilayahs = $this->dataScope()->wilayahOptionsFor($request->user());
         $pelayanans = Pelayanan::orderBy('nama_pelayanan')->get();
 
         // Periode filter
@@ -36,7 +37,7 @@ class DashboardBlesscomnController extends Controller
         $dateTo = Carbon::now()->endOfMonth();
 
         // Global filters
-        $filterWilayah = $request->get('id_wilayah');
+        $filterWilayah = $this->dataScope()->scopedWilayahIdForRequest($request, 'id_wilayah');
         $filterPelayanan = $request->get('id_pelayanan');
 
         // ============================
@@ -254,7 +255,7 @@ class DashboardBlesscomnController extends Controller
         $periode = (int) $request->get('periode', '3');
         $dateFrom = Carbon::now()->subMonths($periode)->startOfMonth();
         $dateTo = Carbon::now()->endOfMonth();
-        $filterWilayah = $request->get('id_wilayah');
+        $filterWilayah = $this->dataScope()->scopedWilayahIdForRequest($request, 'id_wilayah');
         $filterPelayanan = $request->get('id_pelayanan');
 
         $filename = 'blesscomn_report_' . strtolower($reportType) . '_' . date('Ymd_His') . '.csv';
@@ -341,5 +342,10 @@ class DashboardBlesscomnController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function dataScope(): DataScope
+    {
+        return app(DataScope::class);
     }
 }

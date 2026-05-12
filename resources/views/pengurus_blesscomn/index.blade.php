@@ -2,7 +2,7 @@
 
 @section('title', 'Daftar Pengurus Blesscomn')
 @section('breadcrumb')
-<a href="{{ url('/dashboard') }}">Dashboard</a><span>/</span>Pengurus Blesscomn
+<a href="{{ route('dashboard') }}">Dashboard</a><span>/</span>Pengurus Blesscomn
 @endsection
 
 @section('content')

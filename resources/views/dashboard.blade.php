@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard')
-@section('breadcrumb', 'Dashboard')
+@section('title', 'Dashboard Laporan PA')
+@section('breadcrumb', 'Dashboard Laporan PA')
 
 @section('content')
 <div class="page-header">
-    <h1 class="page-title">Dashboard</h1>
+    <h1 class="page-title">Dashboard Laporan PA</h1>
     <p class="page-subtitle">Selamat datang di Sistem Manajemen GKKD Jakarta</p>
 </div>
 
@@ -186,33 +186,4 @@
     </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="row g-4 mt-1">
-    <div class="col-12">
-        <div class="gkkd-card fade-in">
-            <div class="gkkd-card-header">
-                <h3 class="gkkd-card-title"><i class="fas fa-bolt me-2" style="color: var(--accent);"></i>Aksi Cepat</h3>
-            </div>
-            <div class="gkkd-card-body">
-                <div class="d-flex flex-wrap gap-3">
-                    <a href="{{ route('wilayah.create') }}" class="btn-gkkd btn-primary-gkkd">
-                        <i class="fas fa-plus"></i> Tambah Wilayah
-                    </a>
-                    <a href="{{ route('pelayanan.create') }}" class="btn-gkkd btn-primary-gkkd">
-                        <i class="fas fa-plus"></i> Tambah Pelayanan
-                    </a>
-                    <a href="{{ route('pembimbing.create') }}" class="btn-gkkd btn-accent-gkkd">
-                        <i class="fas fa-plus"></i> Tambah Pembimbing
-                    </a>
-                    <a href="{{ route('anak_bimbingan.create') }}" class="btn-gkkd btn-accent-gkkd">
-                        <i class="fas fa-plus"></i> Tambah Anak PA
-                    </a>
-                    <a href="{{ route('laporan_pa.create') }}" class="btn-gkkd btn-primary-gkkd" style="background: linear-gradient(135deg, #7c3aed, #a78bfa);">
-                        <i class="fas fa-plus"></i> Input Laporan PA
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection

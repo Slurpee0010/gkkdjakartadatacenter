@@ -29,4 +29,10 @@ class AnakBimbingan extends Model
     {
         return $this->belongsTo(Pelayanan::class);
     }
+
+    // Relasi ke Laporan PA
+    public function laporanPas()
+    {
+        return $this->hasMany(LaporanPa::class, 'anak_pa_id');
+    }
 }
